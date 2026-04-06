@@ -1,5 +1,6 @@
 package com.dimas.dimasproject.feature.randomnumber.presentation
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +44,7 @@ fun RandomNumberScreen(
         viewModel.effect.collect { effect ->
             when (effect) {
                 is RandomNumberUiEffect.ShowSnackbar -> {
+                    Log.d("RandomNumberScreen", "Showing snackbar: ${effect.message}")
                     snackbarHostState.showSnackbar(effect.message)
                 }
             }

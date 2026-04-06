@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -41,7 +43,11 @@ abstract class BaseViewModel<S : BaseUiState, I : BaseIntent, E : BaseUiEffect>(
 
     // ── Effect ───────────────────────────────────────────────────────────────────
 
-    private val _effect = Channel<E>(Channel.BUFFERED)
+    //    private val _effect = Channel<E>(Channel.BUFFERED)
+    private val _effect = MutableSharedFlow<E>(
+        replay = 0, //no replay → no duplicate event
+        extraBufferCapacity = 1
+    )
 
     /**
      * One-time side-effect stream. Backed by a [Channel] so each event is
@@ -56,7 +62,8 @@ abstract class BaseViewModel<S : BaseUiState, I : BaseIntent, E : BaseUiEffect>(
      * }
      * ```
      */
-    val effect: Flow<E> = _effect.receiveAsFlow()
+//    val effect: Flow<E> = _effect.receiveAsFlow()
+    val effect: SharedFlow<E> = _effect
 
     // ── Intent ───────────────────────────────────────────────────────────────────
 
@@ -95,12 +102,13 @@ abstract class BaseViewModel<S : BaseUiState, I : BaseIntent, E : BaseUiEffect>(
      */
     protected fun sendEffect(effect: E) {
         viewModelScope.launch {
-            _effect.send(effect)
+//            _effect.send(effect)
+            _effect.tryEmit(effect)
         }
     }
 
     override fun onCleared() {
         super.onCleared()
-        _effect.close()
+//        _effect.close()
     }
 }
