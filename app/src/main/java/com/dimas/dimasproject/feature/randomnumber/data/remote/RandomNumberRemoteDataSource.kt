@@ -5,9 +5,8 @@ import com.dimas.dimasproject.feature.randomnumber.data.model.RandomNumberRespon
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
-import javax.inject.Inject
 
-class RandomNumberRemoteDataSource @Inject constructor(
+class RandomNumberRemoteDataSource(
     private val client: HttpClient
 ) {
     suspend fun fetchRandomNumber(): RandomNumberResponse {

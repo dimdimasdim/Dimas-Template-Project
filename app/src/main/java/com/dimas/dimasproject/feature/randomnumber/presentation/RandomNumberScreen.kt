@@ -25,13 +25,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.dimas.dimasproject.feature.randomnumber.data.model.RandomNumber
 
 @Composable
 fun RandomNumberScreen(
     modifier: Modifier = Modifier,
-    viewModel: RandomNumberViewModel = hiltViewModel()
+    viewModel: RandomNumberViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
 

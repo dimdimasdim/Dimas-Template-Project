@@ -3,7 +3,6 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.jetbrains.kotlin.compose)
     alias(libs.plugins.jetbrains.kotlin.serialization)
-    alias(libs.plugins.google.hilt)
     alias(libs.plugins.google.ksp)
 }
 
@@ -67,10 +66,9 @@ dependencies {
     // Coroutines
     implementation(libs.coroutines.android)
 
-    // Hilt
-    implementation(libs.dagger.hilt.android)
-    ksp(libs.dagger.hilt.compiler)
-    implementation(libs.androidx.hilt.navigation.compose)
+    // Koin
+    implementation(libs.koin.android)
+    implementation(libs.koin.androidx.compose)
 
     // Ktor
     implementation(libs.ktor.client.android)

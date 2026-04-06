@@ -8,9 +8,8 @@ import com.dimas.dimasproject.feature.randomnumber.data.remote.RandomNumberRemot
 import com.dimas.dimasproject.feature.randomnumber.domain.repository.RandomNumberRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
 
-class RandomNumberRepositoryImpl @Inject constructor(
+class RandomNumberRepositoryImpl(
     private val remote: RandomNumberRemoteDataSource,
     private val local: RandomNumberLocalDataSource
 ) : RandomNumberRepository {

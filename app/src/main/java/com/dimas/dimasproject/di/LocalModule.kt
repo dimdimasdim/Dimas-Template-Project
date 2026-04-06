@@ -1,36 +1,19 @@
 package com.dimas.dimasproject.di
 
-import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
 import androidx.room.Room
 import com.dimas.dimasproject.core.local.db.AppDatabase
 import com.dimas.dimasproject.core.local.preferences.AppSettings
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
-import javax.inject.Singleton
+import org.koin.android.ext.koin.androidContext
+import org.koin.dsl.module
 
-@Module
-@InstallIn(SingletonComponent::class)
-object LocalModule {
+val localModule = module {
+    single {
+        Room.databaseBuilder(
+            androidContext(),
+            AppDatabase::class.java,
+            "app_database"
+        ).fallbackToDestructiveMigration().build()
+    }
 
-    @Provides
-    @Singleton
-    fun provideAppDatabase(
-        @ApplicationContext context: Context
-    ): AppDatabase = Room.databaseBuilder(
-        context,
-        AppDatabase::class.java,
-        "app_database"
-    ).fallbackToDestructiveMigration().build()
-
-    @Provides
-    @Singleton
-    fun provideAppSettings(
-        dataStore: DataStore<Preferences>
-    ): AppSettings = AppSettings(dataStore)
+    single { AppSettings(get()) }
 }
-

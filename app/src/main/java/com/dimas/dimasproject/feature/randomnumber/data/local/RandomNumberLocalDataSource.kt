@@ -2,9 +2,8 @@ package com.dimas.dimasproject.feature.randomnumber.data.local
 
 import com.dimas.dimasproject.feature.randomnumber.data.model.RandomNumberEntity
 import kotlinx.coroutines.flow.Flow
-import javax.inject.Inject
 
-class RandomNumberLocalDataSource @Inject constructor(
+class RandomNumberLocalDataSource(
     private val dao: RandomNumberDao
 ) {
     fun getAll(): Flow<List<RandomNumberEntity>> = dao.getAll()
