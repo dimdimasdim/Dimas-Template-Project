@@ -57,7 +57,7 @@ fun RandomNumberScreen(
 
             // Fetch button
             Button(
-                onClick = { viewModel.onEvent(RandomNumberUiEvent.FetchRandom) },
+                onClick = { viewModel.onIntent(RandomNumberUiEvent.FetchRandom) },
                 enabled = !state.isLoading
             ) {
                 if (state.isLoading) {
@@ -100,7 +100,7 @@ fun RandomNumberScreen(
                     .align(Alignment.BottomCenter)
                     .padding(16.dp),
                 action = {
-                    TextButton(onClick = { viewModel.onEvent(RandomNumberUiEvent.DismissError) }) {
+                    TextButton(onClick = { viewModel.onIntent(RandomNumberUiEvent.DismissError) }) {
                         Text("Dismiss")
                     }
                 }
