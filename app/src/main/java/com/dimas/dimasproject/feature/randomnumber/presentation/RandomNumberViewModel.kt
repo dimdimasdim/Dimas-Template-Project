@@ -1,5 +1,6 @@
 package com.dimas.dimasproject.feature.randomnumber.presentation
 
+import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.dimas.dimasproject.core.presentation.BaseViewModel
 import com.dimas.dimasproject.feature.randomnumber.domain.usecase.FetchRandomNumberUseCase
@@ -26,6 +27,7 @@ class RandomNumberViewModel(
     private fun observeHistory() {
         getAllRandomNumbers()
             .onEach { list ->
+                Log.e("RandomNumberViewModel", "Fetched history - Observer : ${list.firstOrNull()} items")
                 updateState { copy(history = list, latest = list.firstOrNull()) }
             }
             .launchIn(viewModelScope)
@@ -36,7 +38,8 @@ class RandomNumberViewModel(
             updateState { copy(isLoading = true) }
             fetchRandomNumber()
                 .onSuccess { result ->
-                    updateState { copy(isLoading = false, latest = result) }
+                    updateState { copy(isLoading = false) }
+                    Log.e("RandomNumberViewModel", "Fetched history - fetching : $result items")
                     sendEffect(RandomNumberUiEffect.ShowSnackbar("Fetched number: ${result.number} 🎲"))
                 }
                 .onFailure { error ->
