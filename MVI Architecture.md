@@ -119,9 +119,10 @@ app/src/main/java/com/dimas/dimasproject/
 │   │   └── preferences/
 │   │       └── AppSettings.kt     # DataStore wrapper utility class
 │   └── presentation/              # ── MVI base contracts ──
-│       ├── BaseUiState.kt         # Marker interface for all UI states
-│       ├── BaseIntent.kt          # Marker interface for all user intents
-│       └── BaseViewModel.kt       # Abstract ViewModel<S, I>
+│       ├── BaseUiState.kt         # Marker interface — persistent screen state
+│       ├── BaseIntent.kt          # Marker interface — user actions
+│       ├── BaseUiEffect.kt        # Marker interface — one-time side effects
+│       └── BaseViewModel.kt       # Abstract ViewModel<S, I, E>
 │
 ├── di/                            # Global Koin modules (app-level)
 │   ├── CoreModule.kt              # val coreModule — provides DataStore
@@ -207,7 +208,8 @@ All base contracts live in `core/presentation/`.
 interface BaseUiState
 ```
 
-Marker interface. Every screen state **must** be a `data class` implementing `BaseUiState`.
+Marker interface. Every screen state **must** be a `data class` implementing `BaseUiState`.  
+Represents **persistent** screen state that survives recomposition.
 
 ### 5.2 BaseIntent
 
@@ -216,13 +218,31 @@ Marker interface. Every screen state **must** be a `data class` implementing `Ba
 interface BaseIntent
 ```
 
-Marker interface. Every screen's events **must** be a `sealed interface` implementing `BaseIntent`.
+Marker interface. Every screen's user actions **must** be a `sealed interface` implementing `BaseIntent`.
 
-### 5.3 BaseViewModel
+### 5.3 BaseUiEffect
+
+```kotlin
+// core/presentation/BaseUiEffect.kt
+interface BaseUiEffect
+```
+
+Marker interface. Every screen's one-time side effects **must** be a `sealed interface` implementing `BaseUiEffect`.
+
+> **State vs Effect — when to use which:**
+>
+> | Scenario | Use |
+> |---|---|
+> | Loading spinner, list data, form values | `BaseUiState` — persistent, survives recomposition |
+> | Navigation to another screen | `BaseUiEffect` — one-time, delivered exactly once |
+> | Snackbar / Toast message | `BaseUiEffect` — one-time, auto-dismissed |
+> | Dialog that must survive back-stack | `BaseUiState` — persistent flag |
+
+### 5.4 BaseViewModel
 
 ```kotlin
 // core/presentation/BaseViewModel.kt
-abstract class BaseViewModel<S : BaseUiState, I : BaseIntent>(
+abstract class BaseViewModel<S : BaseUiState, I : BaseIntent, E : BaseUiEffect>(
     initialState: S
 ) : ViewModel()
 ```
@@ -230,11 +250,31 @@ abstract class BaseViewModel<S : BaseUiState, I : BaseIntent>(
 | Member | Visibility | Description |
 |---|---|---|
 | `uiState: StateFlow<S>` | `public` | Observed by the View. Never expose `MutableStateFlow`. |
+| `effect: Flow<E>` | `public` | One-time side effects backed by `Channel<E>(BUFFERED)`. Each emission is delivered **exactly once**. |
 | `onIntent(intent: I)` | `public` | Called by the View to dispatch a user action |
 | `handleIntent(intent: I)` | `protected abstract` | Implemented by each ViewModel; routes intents to private functions |
 | `updateState { copy(...) }` | `protected` | Partial state update via reducer lambda |
 | `setState(newState: S)` | `protected` | Full state replacement |
+| `sendEffect(effect: E)` | `protected` | Sends a one-time effect through the Channel |
 | `currentState: S` | `protected` | Synchronous snapshot of the current state |
+
+#### How `effect` works internally
+
+```
+ViewModel sends via Channel.send(effect)
+        │
+        ▼
+Channel<E>(BUFFERED) — buffers emissions, survives brief collector absence
+        │
+        ▼
+.receiveAsFlow() — exposes as cold Flow<E>
+        │
+        ▼
+View collects in LaunchedEffect(Unit) — runs once on composition
+        │
+        ▼
+snackbarHostState.showSnackbar(message)  ← suspends until dismissed
+```
 
 ---
 
@@ -378,20 +418,26 @@ The `randomnumber` feature is the canonical example for how all features are str
 | `RandomNumber` | Domain / Data (shared) | Domain model passed between layers |
 | `RandomNumberEntity` | Data (DB) | Room persisted entity |
 
-### State & Events
+### State, Events & Effects
 
 ```kotlin
 // RandomNumberUiState.kt
+
+// State — persistent
 data class RandomNumberUiState(
     val isLoading: Boolean = false,
     val latest: RandomNumber? = null,
-    val history: List<RandomNumber> = emptyList(),
-    val errorMessage: String? = null
+    val history: List<RandomNumber> = emptyList()
 ) : BaseUiState
 
+// Intent — user actions
 sealed interface RandomNumberUiEvent : BaseIntent {
     data object FetchRandom : RandomNumberUiEvent
-    data object DismissError : RandomNumberUiEvent
+}
+
+// Effect — one-time side effects
+sealed interface RandomNumberUiEffect : BaseUiEffect {
+    data class ShowSnackbar(val message: String) : RandomNumberUiEffect
 }
 ```
 
@@ -465,18 +511,25 @@ abstract class AppDatabase : RoomDatabase() {
 }
 ```
 
-### Step 4 — Define the State and Intent
+### Step 4 — Define State, Intent, and Effect
 
 ```kotlin
+// MyScreenUiState.kt
+
 data class MyScreenUiState(
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
-    // ...
+    // add screen-specific fields...
 ) : BaseUiState
 
 sealed interface MyScreenIntent : BaseIntent {
     data object Load : MyScreenIntent
-    // ...
+    // add more user actions...
+}
+
+sealed interface MyScreenEffect : BaseUiEffect {
+    data class ShowSnackbar(val message: String) : MyScreenEffect
+    data class NavigateTo(val route: String) : MyScreenEffect
+    // add more one-time effects...
 }
 ```
 
@@ -485,7 +538,7 @@ sealed interface MyScreenIntent : BaseIntent {
 ```kotlin
 class MyViewModel(
     private val myUseCase: MyUseCase
-) : BaseViewModel<MyScreenUiState, MyScreenIntent>(MyScreenUiState()) {
+) : BaseViewModel<MyScreenUiState, MyScreenIntent, MyScreenEffect>(MyScreenUiState()) {
 
     override fun handleIntent(intent: MyScreenIntent) {
         when (intent) {
@@ -497,8 +550,14 @@ class MyViewModel(
         viewModelScope.launch {
             updateState { copy(isLoading = true) }
             myUseCase()
-                .onSuccess { updateState { copy(isLoading = false, ...) } }
-                .onFailure { updateState { copy(isLoading = false, errorMessage = it.message) } }
+                .onSuccess { data ->
+                    updateState { copy(isLoading = false, ...) }
+                    sendEffect(MyScreenEffect.ShowSnackbar("Loaded!"))
+                }
+                .onFailure { error ->
+                    updateState { copy(isLoading = false) }
+                    sendEffect(MyScreenEffect.ShowSnackbar(error.message ?: "Error"))
+                }
         }
     }
 }
@@ -537,9 +596,29 @@ startKoin {
 @Composable
 fun MyScreen(viewModel: MyViewModel = koinViewModel()) {
     val state by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    // Dispatch intent
-    Button(onClick = { viewModel.onIntent(MyScreenIntent.Load) }) { ... }
+    // Collect one-time effects
+    LaunchedEffect(Unit) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is MyScreenEffect.ShowSnackbar -> snackbarHostState.showSnackbar(effect.message)
+                is MyScreenEffect.NavigateTo   -> navController.navigate(effect.route)
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // ... screen content ...
+
+        // Dispatch intent on user action
+        Button(onClick = { viewModel.onIntent(MyScreenIntent.Load) }) { ... }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
 }
 ```
 
@@ -552,6 +631,7 @@ fun MyScreen(viewModel: MyViewModel = koinViewModel()) {
 | Feature package | `feature/<lowercase>` | `feature/randomnumber` |
 | UI State | `<Feature>UiState` | `RandomNumberUiState` |
 | UI Event / Intent | `<Feature>UiEvent` | `RandomNumberUiEvent` |
+| UI Effect (one-time) | `<Feature>UiEffect` | `RandomNumberUiEffect` |
 | ViewModel | `<Feature>ViewModel` | `RandomNumberViewModel` |
 | Screen Composable | `<Feature>Screen` | `RandomNumberScreen` |
 | UseCase | `<Verb><Noun>UseCase` | `FetchRandomNumberUseCase` |

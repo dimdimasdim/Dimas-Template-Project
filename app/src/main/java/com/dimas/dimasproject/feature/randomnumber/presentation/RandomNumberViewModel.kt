@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 class RandomNumberViewModel(
     private val fetchRandomNumber: FetchRandomNumberUseCase,
     private val getAllRandomNumbers: GetAllRandomNumbersUseCase
-) : BaseViewModel<RandomNumberUiState, RandomNumberUiEvent>(RandomNumberUiState()) {
+) : BaseViewModel<RandomNumberUiState, RandomNumberUiEvent, RandomNumberUiEffect>(RandomNumberUiState()) {
 
     init {
         observeHistory()
@@ -20,7 +20,6 @@ class RandomNumberViewModel(
     override fun handleIntent(intent: RandomNumberUiEvent) {
         when (intent) {
             is RandomNumberUiEvent.FetchRandom -> fetchRandom()
-            is RandomNumberUiEvent.DismissError -> dismissError()
         }
     }
 
@@ -34,18 +33,16 @@ class RandomNumberViewModel(
 
     private fun fetchRandom() {
         viewModelScope.launch {
-            updateState { copy(isLoading = true, errorMessage = null) }
+            updateState { copy(isLoading = true) }
             fetchRandomNumber()
                 .onSuccess { result ->
                     updateState { copy(isLoading = false, latest = result) }
+                    sendEffect(RandomNumberUiEffect.ShowSnackbar("Fetched number: ${result.number} 🎲"))
                 }
                 .onFailure { error ->
-                    updateState { copy(isLoading = false, errorMessage = error.message ?: "Unknown error") }
+                    updateState { copy(isLoading = false) }
+                    sendEffect(RandomNumberUiEffect.ShowSnackbar(error.message ?: "Unknown error"))
                 }
         }
-    }
-
-    private fun dismissError() {
-        updateState { copy(errorMessage = null) }
     }
 }
